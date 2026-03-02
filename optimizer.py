@@ -16,7 +16,7 @@ Passes (applied in order):
 """
 
 import math
-from tac_generator import TACInstruction, format_tac
+from gimple_generator import GimpleStmt, format_gimple
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ def constant_folding(instructions):
                 # Convert float results that are whole numbers to int
                 if isinstance(val, float) and val == int(val):
                     val = int(val)
-                result.append(TACInstruction('=', str(val), result=instr.result))
+                result.append(GimpleStmt('=', str(val), result=instr.result))
                 changed = True
                 continue
 
@@ -211,7 +211,7 @@ def algebraic_simplification(instructions):
                     simplified = '1'
 
             if simplified is not None:
-                result.append(TACInstruction('=', simplified, result=instr.result))
+                result.append(GimpleStmt('=', simplified, result=instr.result))
                 changed = True
                 continue
 
@@ -240,7 +240,7 @@ def strength_reduction(instructions):
                 n = get_number(instr.arg2)
                 if isinstance(n, int) and n > 1 and is_power_of_two(n):
                     shift = log2_int(n)
-                    result.append(TACInstruction(
+                    result.append(GimpleStmt(
                         '<<', instr.arg1, str(shift), instr.result
                     ))
                     changed = True
@@ -249,7 +249,7 @@ def strength_reduction(instructions):
                 n = get_number(instr.arg1)
                 if isinstance(n, int) and n > 1 and is_power_of_two(n):
                     shift = log2_int(n)
-                    result.append(TACInstruction(
+                    result.append(GimpleStmt(
                         '<<', instr.arg2, str(shift), instr.result
                     ))
                     changed = True
@@ -260,7 +260,7 @@ def strength_reduction(instructions):
                 n = get_number(instr.arg2)
                 if isinstance(n, int) and n > 1 and is_power_of_two(n):
                     shift = log2_int(n)
-                    result.append(TACInstruction(
+                    result.append(GimpleStmt(
                         '>>', instr.arg1, str(shift), instr.result
                     ))
                     changed = True
@@ -341,7 +341,7 @@ def common_subexpression_elimination(instructions):
             key = (instr.op, instr.arg1, instr.arg2)
             if key in expr_map:
                 # Reuse the previous result
-                result.append(TACInstruction(
+                result.append(GimpleStmt(
                     '=', expr_map[key], result=instr.result
                 ))
                 changed = True
@@ -449,7 +449,7 @@ def unreachable_code_elimination(instructions):
             val = get_number(instr.arg1)
             if val == 0:
                 # iffalse 0 goto L → always branches, becomes goto L
-                result.append(TACInstruction('goto', instr.arg2))
+                result.append(GimpleStmt('goto', instr.arg2))
                 unreachable = True
                 changed = True
                 continue
@@ -548,12 +548,18 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
     """Inline small function bodies at their call sites.
     Only inlines functions with body size <= max_body_size instructions.
     """
-    # Extract function definitions: name -> (params, body_instructions)
+    # Detect entry-point functions: defined but never explicitly called.
+    # These are never candidates for inlining (e.g. main).
+    all_defined = {i.arg1 for i in instructions if i.op == 'func_begin'}
+    all_called  = {i.arg1 for i in instructions if i.op == 'call'}
+    entry_points = all_defined - all_called
+
+    # Extract function definitions: name -> body_instructions
     func_defs = {}
     i = 0
     while i < len(instructions):
         instr = instructions[i]
-        if instr.op == 'func_begin' and instr.arg1 != 'main':
+        if instr.op == 'func_begin' and instr.arg1 not in entry_points:
             func_name = instr.arg1
             body = []
             i += 1
@@ -565,7 +571,7 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
         i += 1
 
     if not func_defs:
-        return copy_instructions(instructions), False
+        return copy_instructions(instructions), False, set()
 
     # Find the parameter names for each function from the original AST
     # We infer params by looking at param instructions before calls
@@ -573,6 +579,7 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
 
     result = []
     changed = False
+    inlined_funcs = set()   # tracks which function names were actually inlined
     inline_counter = [0]
 
     def get_unique_suffix():
@@ -611,6 +618,9 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
                 body_defs = set()
                 body_uses = set()
                 for bi in func_body:
+                    # Skip labels — they aren't variable uses
+                    if bi.op in ('label', 'goto', 'iffalse'):
+                        continue
                     if bi.result:
                         body_defs.add(bi.result)
                     if bi.arg1 and not is_number(bi.arg1):
@@ -619,7 +629,7 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
                         body_uses.add(bi.arg2)
 
                 # Parameters are variables used but not defined in body
-                func_params = list(body_uses - body_defs)
+                func_params = sorted(body_uses - body_defs)
 
                 # Build param mapping
                 param_map = {}
@@ -640,13 +650,16 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
                         return None
                     return rename_map.get(val, val)
 
-                # Inline the function body
+                # Inline the function body (skip labels — they belong to
+                # the original function and would conflict in the caller)
                 for bi in func_body:
-                    if bi.op == 'return':
+                    if bi.op in ('label', 'goto', 'iffalse'):
+                        continue  # skip control flow from inlined function
+                    elif bi.op == 'return':
                         # return val → call_result = val
                         ret_val = resolve(bi.arg1)
                         if call_result:
-                            result.append(TACInstruction(
+                            result.append(GimpleStmt(
                                 '=', ret_val, result=call_result
                             ))
                     else:
@@ -658,6 +671,7 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
                         result.append(new_bi)
 
                 changed = True
+                inlined_funcs.add(func_name)
                 i = j + 1
                 continue
 
@@ -670,6 +684,61 @@ def function_inlining(instructions, function_tacs, max_body_size=10):
         result.append(instr.copy())
         i += 1
 
+    return result, changed, inlined_funcs
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PASS 11 (internal): Remove Inlined Functions
+# ═══════════════════════════════════════════════════════════════════════════
+
+def remove_inlined_functions(instructions, inlined_funcs):
+    """Remove function definitions that were fully inlined at their call sites.
+    inlined_funcs: the set of function names returned by function_inlining.
+    """
+    if not inlined_funcs:
+        return copy_instructions(instructions), False
+
+    result = []
+    skip = False
+    changed = False
+    for instr in instructions:
+        if instr.op == 'func_begin' and instr.arg1 in inlined_funcs:
+            skip = True
+            changed = True
+            continue
+        if instr.op == 'func_end' and skip:
+            skip = False
+            continue
+        if skip:
+            continue
+        result.append(instr.copy())
+
+    return result, changed
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PASS 12 (internal): Redundant Goto Elimination
+# ═══════════════════════════════════════════════════════════════════════════
+
+def redundant_goto_elimination(instructions):
+    """Remove 'goto <bb N>' when <bb N> is the very next label in sequence."""
+    result = []
+    changed = False
+    n = len(instructions)
+    for i, instr in enumerate(instructions):
+        if instr.op == 'goto':
+            # Find the next non-nothing instruction
+            next_label = None
+            for j in range(i + 1, n):
+                if instructions[j].op == 'label':
+                    next_label = instructions[j].arg1
+                    break
+                elif instructions[j].op not in ('func_begin', 'func_end'):
+                    break
+            if next_label == instr.arg1:
+                changed = True
+                continue  # skip this redundant goto
+        result.append(instr.copy())
     return result, changed
 
 
@@ -695,19 +764,20 @@ def optimize(instructions, function_tacs=None, verbose=True):
     """Run all optimization passes on the TAC instructions.
 
     Args:
-        instructions: list of TACInstruction
+        instructions: list of GimpleStmt
         function_tacs: dict of function_name -> body indices (for inlining)
         verbose: if True, print each pass's result
 
     Returns:
-        optimized list of TACInstruction, and a log of changes per pass
+        optimized list of GimpleStmt, and a log of changes per pass
     """
     current = copy_instructions(instructions)
     pass_log = []
 
+    inlined_funcs = set()
     for pass_num, (name, pass_fn) in enumerate(ALL_PASSES, 1):
         if name == "Function Inlining":
-            new_instrs, changed = function_inlining(
+            new_instrs, changed, inlined_funcs = function_inlining(
                 current, function_tacs or {}
             )
         else:
@@ -720,29 +790,46 @@ def optimize(instructions, function_tacs=None, verbose=True):
             print(f"\n{'='*65}")
             print(f"  PASS {pass_num}: {name} [{status}]")
             print(f"{'='*65}")
-            print(format_tac(new_instrs))
+            print(format_gimple(new_instrs))
 
         current = new_instrs
 
-    # Run a second round of constant folding + propagation + dead code
-    # to catch opportunities created by earlier passes
-    cleanup_passes = [
-        ("Constant Folding (cleanup)",    constant_folding),
-        ("Constant Propagation (cleanup)", constant_propagation),
-        ("Dead Code Elimination (cleanup)", dead_code_elimination),
+    # --- Post-inlining cleanup: run to fixed point ---
+    # After inlining, new constant-folding and copy-prop opportunities appear.
+    # We iterate all cleanup passes until nothing changes anymore.
+    cleanup_pass_fns = [
+        constant_folding,
+        constant_propagation,
+        algebraic_simplification,
+        copy_propagation,
+        dead_code_elimination,
+        unreachable_code_elimination,
+        redundant_goto_elimination,
     ]
 
     any_cleanup = False
-    for name, pass_fn in cleanup_passes:
-        new_instrs, changed = pass_fn(current)
-        if changed:
-            any_cleanup = True
-        current = new_instrs
+    for _round in range(10):  # max 10 rounds to guarantee termination
+        round_changed = False
+        for pass_fn in cleanup_pass_fns:
+            new_instrs, changed = pass_fn(current)
+            if changed:
+                round_changed = True
+                any_cleanup = True
+            current = new_instrs
+        if not round_changed:
+            break  # fixed point reached
+
+    # --- Remove fully-inlined function bodies ---
+    current, inlined_removed = remove_inlined_functions(
+        current, inlined_funcs
+    )
+    if inlined_removed:
+        any_cleanup = True
 
     if any_cleanup and verbose:
         print(f"\n{'='*65}")
-        print(f"  CLEANUP PASSES (Folding + Propagation + Dead Code)")
+        print(f"  CLEANUP PASSES (fixed-point folding + dead code + goto elim)")
         print(f"{'='*65}")
-        print(format_tac(current))
+        print(format_gimple(current))
 
     return current, pass_log

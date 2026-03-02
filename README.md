@@ -1,8 +1,8 @@
 # cpp-tac-optimizer
 
-A Python-based tool that transforms **C++ source code** into **Three-Address Code (TAC)** and applies **10 optimization passes** — built from scratch with no external dependencies.
+A Python-based tool that transforms **C++ source code** into **GIMPLE intermediate representation** and applies **10 optimization passes** — built from scratch with no external dependencies.
 
-> Built for Compiler Design coursework. Demonstrates key compiler optimization techniques on a supported C++ subset.
+> GIMPLE is GCC's tree-based IR used for compiler optimizations. This tool generates a simplified GIMPLE format and demonstrates key optimization techniques.
 
 ---
 
@@ -10,11 +10,11 @@ A Python-based tool that transforms **C++ source code** into **Three-Address Cod
 
 | # | Optimization Pass | Description |
 |---|-------------------|-------------|
-| 1 | **Constant Folding** | Evaluates constant expressions at compile time (`3 + 5` → `8`) |
+| 1 | **Constant Folding** | Evaluates constant expressions at compile time (`3 + 5` -> `8`) |
 | 2 | **Constant Propagation** | Replaces variables with known constant values |
-| 3 | **Algebraic Simplification** | Simplifies identity ops (`x * 1` → `x`, `x + 0` → `x`) |
-| 4 | **Strength Reduction** | Replaces expensive ops (`x * 4` → `x << 2`) |
-| 5 | **Copy Propagation** | Eliminates redundant copies (`a = b; c = a` → `c = b`) |
+| 3 | **Algebraic Simplification** | Simplifies identity ops (`x * 1` -> `x`, `x + 0` -> `x`) |
+| 4 | **Strength Reduction** | Replaces expensive ops (`x * 4` -> `x << 2`) |
+| 5 | **Copy Propagation** | Eliminates redundant copies (`a = b; c = a` -> `c = b`) |
 | 6 | **Common Subexpression Elimination** | Reuses previously computed expressions |
 | 7 | **Dead Code Elimination** | Removes assignments to unused variables |
 | 8 | **Unreachable Code Elimination** | Removes code after `return`, inside `if(false)`, etc. |
@@ -29,19 +29,19 @@ A Python-based tool that transforms **C++ source code** into **Three-Address Cod
 C++ Source Code
      |
      v
- [ Lexer ]         Tokenize source into a token stream
+ [ Lexer ]              Tokenize source into a token stream
      |
      v
- [ Parser ]        Build an Abstract Syntax Tree (AST)
+ [ Parser ]             Build an Abstract Syntax Tree (AST)
      |
      v
- [ TAC Generator ] Convert AST to Three-Address Code
+ [ GIMPLE Generator ]   Convert AST to GIMPLE IR
      |
      v
- [ Optimizer ]     Apply 10 optimization passes
+ [ Optimizer ]          Apply 10 optimization passes
      |
      v
- Optimized TAC     Final output with reduction summary
+ Optimized GIMPLE IR    Final output with reduction summary
 ```
 
 ---
@@ -67,9 +67,40 @@ python main.py your_file.cpp
 The tool prints each stage:
 1. **Tokens** — lexical analysis output
 2. **AST** — parsed abstract syntax tree
-3. **Unoptimized TAC** — raw three-address code
+3. **Unoptimized GIMPLE** — raw GIMPLE IR with function declarations
 4. **Each optimization pass** — with `[CHANGED]` or `[no change]` status
-5. **Final optimized TAC** — with instruction count and reduction percentage
+5. **Final optimized GIMPLE** — with statement count and reduction percentage
+
+---
+
+## GIMPLE Output Format
+
+The output follows GCC's GIMPLE conventions:
+- **Temporaries** use `_N` naming (e.g., `_0`, `_1`, `_2`)
+- **Basic blocks** are labeled as `<bb N>:`
+- **Conditionals** use `if (_N == 0) goto <bb M>;`
+- **I/O** is represented as `__builtin_print()`
+- **Functions** are wrapped with type signatures and variable declarations
+
+Example output:
+```c
+main ()
+{
+  int _0, _1, _2;
+  int a, b;
+
+  <bb 2>:
+    _0 = 3 + 5;
+    a = _0;
+    _1 = a * 2;
+    b = _1;
+    if (_2 == 0) goto <bb 4>;
+  <bb 3>:
+    ...
+  <bb 4>:
+    return 0;
+}
+```
 
 ---
 
@@ -93,13 +124,13 @@ The tool prints each stage:
 
 ```
 cpp-tac-optimizer/
-├── ast_nodes.py        # AST node class definitions
-├── lexer.py            # Regex-based tokenizer
-├── parser.py           # Recursive descent parser
-├── tac_generator.py    # AST → Three-Address Code
-├── optimizer.py        # 10 optimization passes
-├── main.py             # CLI entry point
-├── sample_input.cpp    # Sample C++ input (tests all passes)
+├── ast_nodes.py            # AST node class definitions
+├── lexer.py                # Regex-based tokenizer
+├── parser.py               # Recursive descent parser
+├── gimple_generator.py     # AST -> GIMPLE IR
+├── optimizer.py            # 10 optimization passes
+├── main.py                 # CLI entry point
+├── sample_input.cpp        # Sample C++ input (tests all passes)
 └── README.md
 ```
 
@@ -110,8 +141,8 @@ cpp-tac-optimizer/
 Running on `sample_input.cpp`:
 
 ```
-Instructions before: 56
-Instructions after:  37
+Statements before: 56
+Statements after:  37
 Removed: 19 (33.9% reduction)
 
 OPTIMIZATION SUMMARY
@@ -125,50 +156,4 @@ OPTIMIZATION SUMMARY
   Pass  8: Unreachable Code Elimination             [APPLIED]
   Pass  9: Loop Optimization                        [APPLIED]
   Pass 10: Function Inlining                        [APPLIED]
-```
-
----
-
-## How It Works
-
-### Three-Address Code Format
-
-Each TAC instruction has **at most one operator** and **up to two operands**:
-
-```
-t0 = 3 + 5          # binary operation
-a = t0               # assignment
-iffalse t1 goto L0   # conditional branch
-goto L1              # unconditional jump
-param x              # function parameter
-t2 = call square, 1  # function call
-return t2            # return value
-print a              # output
-```
-
-### Optimization Example
-
-**Before (unoptimized):**
-```
-t0 = 3 + 5       # constant expression
-a = t0
-t1 = a * 2       # a is known to be 8
-b = t1
-t2 = b * 1       # multiply by 1 (identity)
-c = t2
-t3 = c * 4       # multiply by power of 2
-e = t3
-f = e             # redundant copy
-t4 = f + 10       # uses copy instead of original
-g = t4
-j = 42            # never used
-```
-
-**After (optimized):**
-```
-a = 8             # constant folded
-b = 16            # constant propagated + folded
-e = 16 << 2       # algebraic simplified + strength reduced
-g = e + 10        # copy propagated
-                  # j = 42 removed (dead code)
 ```
