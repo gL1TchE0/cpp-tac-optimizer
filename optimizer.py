@@ -395,6 +395,19 @@ def dead_code_elimination(instructions):
             result.append(instr.copy())
             continue
 
+        # Treat assignments whose RHS looks like a function call as
+        # side-effectful and thus not removable, even if the result
+        # variable is never used later. This keeps GCC's I/O calls such
+        # as std::basic_ostream<char>::operator<< (&cout, x).
+        if (
+            instr.op == '='
+            and isinstance(instr.arg1, str)
+            and '(' in instr.arg1
+            and ')' in instr.arg1
+        ):
+            result.append(instr.copy())
+            continue
+
         # Remove assignment if result is never used
         if instr.result and instr.result not in used_vars:
             changed = True

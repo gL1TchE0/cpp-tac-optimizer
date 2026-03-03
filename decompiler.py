@@ -342,6 +342,10 @@ def gimple_to_cpp(instructions):
     """
     parts = []
     for func_name, body in _extract_functions(instructions):
+        # Skip internal GCC helper functions; they are implementation details
+        # (e.g. iostream initialization) and not part of the user's program.
+        if func_name.startswith("__"):
+            continue
         parts.append(_decompile_function(func_name, body))
     return '\n\n'.join(parts)
 

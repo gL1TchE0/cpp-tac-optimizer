@@ -39,7 +39,9 @@ class GimpleStmt:
         elif self.op == 'goto':
             return f"    goto {self.arg1};"
         elif self.op == 'iffalse':
-            return f"    if ({self.arg1} == 0) goto {self.arg2};"
+            # Display more intuitively as a negative condition:
+            # internal semantics: if (arg1 == 0) goto arg2;
+            return f"    if ({self.arg1}) goto {self.arg2};"
         elif self.op == 'param':
             return f"    param {self.arg1};"
         elif self.op == 'call':
@@ -83,6 +85,16 @@ def format_gimple(instructions):
 
         if instr.op == 'func_begin':
             func_name = instr.arg1
+            # Skip internal GCC helper functions (they are not part of the
+            # user-level program we want to display, e.g. __tcf_0, static
+            # initialization helpers, etc.).
+            if func_name.startswith("__"):
+                # Fast-forward to matching func_end
+                i += 1
+                while i < len(instructions) and instructions[i].op != 'func_end':
+                    i += 1
+                # func_end will be skipped by the main loop increment
+                continue
             # Collect all instructions in this function
             body = []
             i += 1
@@ -149,9 +161,16 @@ def _is_user_var(name):
         return False
     except ValueError:
         pass
-    if name.startswith('<bb') or name.startswith('_'):
+    # Treat any GIMPLE label-like tokens as non-vars
+    if name.startswith('<') or name.startswith('_'):
         return False
+    # Obvious boolean literals
     if name in ('0', '1'):
+        return False
+    # Heuristic: anything that looks like an expression (spaces, operators,
+    # parentheses, logical not) is not a "user variable" for declaration
+    # purposes in formatted GIMPLE.
+    if any(ch in name for ch in (" ", "(", ")", "!", "&", "|", "<", ">", "=")):
         return False
     return True
 
@@ -436,9 +455,9 @@ def _parse_gcc_gimple_dump(dump_path):
     dump_path = Path(dump_path)
     text = dump_path.read_text(encoding="utf-8", errors="replace")
 
-    func_header_re = re.compile(r"^([A-Za-z_]\w*)\s*\(")
-    bb_label_re = re.compile(r"^<bb\s+(\d+)>:")
-    goto_re = re.compile(r"^\s*goto\s+<bb\s+(\d+)>;")
+    # Labels for basic blocks or compiler-generated targets
+    generic_label_re = re.compile(r"^<([^>]+)>:")
+    goto_re = re.compile(r"^\s*goto\s+<([^>]+)>;")
     return_re = re.compile(r"^\s*return(?:\s+(.+))?;")
     assign_re = re.compile(r"^\s*([\w\.]+)\s*=\s*(.+);")
 
@@ -450,6 +469,14 @@ def _parse_gcc_gimple_dump(dump_path):
 
     def parse_rhs(rhs):
         rhs = rhs.strip()
+
+        # Heuristic: treat expressions that look like function calls
+        # (including operator<< calls) as opaque RHS for a simple
+        # assignment, so that dead-code elimination preserves their
+        # side effects.
+        if "(" in rhs and rhs.endswith(")") and "::operator" in rhs:
+            return "=", rhs, None
+
         # Unary negation / logical not
         if rhs.startswith("-") and " " not in rhs[1:]:
             return "neg", rhs[1:].strip(), None
@@ -471,6 +498,7 @@ def _parse_gcc_gimple_dump(dump_path):
     function_tacs = {}
     current_func = None
     func_start = None
+    brace_depth = 0  # track nested scopes within a function
 
     lines = text.splitlines()
     for line in lines:
@@ -480,46 +508,86 @@ def _parse_gcc_gimple_dump(dump_path):
         if not stripped or stripped.startswith(";;"):
             continue
 
-        # Function header: foo () / int foo (int x)
-        m_func = func_header_re.match(stripped)
-        if m_func and not stripped.endswith(";"):
-            name = m_func.group(1)
-            # Avoid matching constructs like "struct foo {"
-            if not stripped.startswith(("struct ", "class ", "union ")):
-                # Close previous function if any
-                if current_func is not None:
+        # Update brace depth for function bodies
+        if current_func is not None:
+            if "{" in stripped:
+                brace_depth += stripped.count("{")
+            if "}" in stripped:
+                # If this closing brace ends the function body, handle below
+                brace_depth -= stripped.count("}")
+                if brace_depth <= 0:
                     function_tacs[current_func] = list(
                         range(func_start, len(instructions))
                     )
                     instructions.append(GimpleStmt("func_end", current_func))
+                    current_func = None
+                    func_start = None
+                    brace_depth = 0
+                    continue
 
-                current_func = name
-                func_start = len(instructions)
-                instructions.append(GimpleStmt("func_begin", name))
+        # Function header lines look like:
+        #   int square(int) (int x)
+        #   int add(int, int) (int a, int b)
+        #   int main() ()
+        #   void __static_initialization_and_destruction_0(int, int) (...)
+        if current_func is None and "(" in stripped and not stripped.endswith(";"):
+            if not stripped.startswith(("struct ", "class ", "union ")):
+                # Take the last word before the first '(' as the function name.
+                prefix = stripped.split("(", 1)[0].strip()
+                parts = prefix.split()
+                if parts:
+                    name = parts[-1]
+                    # Close previous function if any (defensive, though we
+                    # shouldn't normally see nested functions in C++).
+                    if current_func is not None:
+                        function_tacs[current_func] = list(
+                            range(func_start, len(instructions))
+                        )
+                        instructions.append(GimpleStmt("func_end", current_func))
+
+                    current_func = name
+                    func_start = len(instructions)
+                    brace_depth = 0
+                    instructions.append(GimpleStmt("func_begin", name))
+                    continue
+
+        # Basic block / compiler labels: <bb 2>: or <D.35869>:
+        m_lbl = generic_label_re.match(stripped)
+        if m_lbl:
+            label_name = m_lbl.group(1)
+            instructions.append(GimpleStmt("label", f"<{label_name}>"))
+            continue
+
+        # GCC-style conditional branch:
+        #   if (COND) goto <T>; else goto <F>;
+        # We encode this as:
+        #   iffalse !COND, <T>
+        # so that our decompiler sees the loop/if condition as (!COND) and
+        # emits `while (!COND)` or `if (!COND)` consistently with control flow.
+        if stripped.startswith("if ") and " goto <" in stripped and " else goto <" in stripped:
+            try:
+                cond_part, rest = stripped.split(")", 1)
+                cond_expr = cond_part.split("(", 1)[1].strip()
+                # rest is like: " goto <T>; else goto <F>;"
+                # First target (true branch)
+                t_start = rest.index("<") + 1
+                t_end = rest.index(">", t_start)
+                true_label = rest[t_start:t_end]
+                # Build logical negation of the condition for our representation
+                neg_cond = f"!({cond_expr})"
+                instructions.append(
+                    GimpleStmt("iffalse", neg_cond, f"<{true_label}>")
+                )
                 continue
-
-        # Function end: closing brace at top level of function body
-        if stripped == "}" and current_func is not None:
-            function_tacs[current_func] = list(
-                range(func_start, len(instructions))
-            )
-            instructions.append(GimpleStmt("func_end", current_func))
-            current_func = None
-            func_start = None
-            continue
-
-        # Basic block labels: <bb 2>:
-        m_bb = bb_label_re.match(stripped)
-        if m_bb:
-            bb_num = m_bb.group(1)
-            instructions.append(GimpleStmt("label", f"<bb {bb_num}>"))
-            continue
+            except Exception:
+                # Fall back to normal parsing if anything goes wrong
+                pass
 
         # Goto
         m_goto = goto_re.match(stripped)
         if m_goto:
-            bb_num = m_goto.group(1)
-            instructions.append(GimpleStmt("goto", f"<bb {bb_num}>"))
+            target = m_goto.group(1)
+            instructions.append(GimpleStmt("goto", f"<{target}>"))
             continue
 
         # Return
@@ -550,7 +618,7 @@ def _parse_gcc_gimple_dump(dump_path):
         # not see them.
         continue
 
-    # Close trailing function if file ended without explicit "}"
+    # Close trailing function if file ended without explicit balanced braces
     if current_func is not None:
         function_tacs[current_func] = list(
             range(func_start, len(instructions))
