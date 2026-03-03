@@ -560,23 +560,20 @@ def _parse_gcc_gimple_dump(dump_path):
 
         # GCC-style conditional branch:
         #   if (COND) goto <T>; else goto <F>;
-        # We encode this as:
-        #   iffalse !COND, <T>
-        # so that our decompiler sees the loop/if condition as (!COND) and
-        # emits `while (!COND)` or `if (!COND)` consistently with control flow.
+        # Encode as: iffalse COND, <F>   (i.e., if (!COND) goto F)
         if stripped.startswith("if ") and " goto <" in stripped and " else goto <" in stripped:
             try:
                 cond_part, rest = stripped.split(")", 1)
                 cond_expr = cond_part.split("(", 1)[1].strip()
                 # rest is like: " goto <T>; else goto <F>;"
-                # First target (true branch)
-                t_start = rest.index("<") + 1
-                t_end = rest.index(">", t_start)
-                true_label = rest[t_start:t_end]
-                # Build logical negation of the condition for our representation
-                neg_cond = f"!({cond_expr})"
+                else_idx = rest.index("else")
+                else_part = rest[else_idx:]
+                # else_part: "else goto <F>;"
+                f_start = else_part.index("<") + 1
+                f_end = else_part.index(">", f_start)
+                false_label = else_part[f_start:f_end]
                 instructions.append(
-                    GimpleStmt("iffalse", neg_cond, f"<{true_label}>")
+                    GimpleStmt("iffalse", cond_expr, f"<{false_label}>")
                 )
                 continue
             except Exception:

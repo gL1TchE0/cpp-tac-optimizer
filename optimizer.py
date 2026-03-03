@@ -55,6 +55,53 @@ COMPARISON_OPS = {'<', '>', '<=', '>=', '==', '!='}
 BINARY_OPS = ARITHMETIC_OPS | COMPARISON_OPS | {'&&', '||', '<<', '>>'}
 
 
+def eval_const_condition(expr):
+    """Best-effort evaluator for simple constant boolean expressions.
+
+    Supports:
+      - A <cmp> B      where A,B are numeric literals and <cmp> in COMPARISON_OPS
+      - !(inner)      where inner is itself a supported comparison
+
+    Returns:
+      '0' or '1' if evaluable, otherwise None.
+    """
+    if expr is None:
+        return None
+    s = str(expr).strip()
+
+    # Handle logical negation of a comparison: !(A <cmp> B)
+    if s.startswith('!(') and s.endswith(')'):
+        inner = s[2:-1].strip()
+        val = eval_const_condition(inner)
+        if val is None:
+            return None
+        return '0' if val != '0' else '1'
+
+    # Handle plain comparison: A <cmp> B
+    for op in ('<=', '>=', '==', '!=', '<', '>'):
+        parts = s.split(op)
+        if len(parts) == 2:
+            left, right = parts[0].strip(), parts[1].strip()
+            if is_number(left) and is_number(right):
+                a = get_number(left)
+                b = get_number(right)
+                if op == '<':
+                    res = int(a < b)
+                elif op == '>':
+                    res = int(a > b)
+                elif op == '<=':
+                    res = int(a <= b)
+                elif op == '>=':
+                    res = int(a >= b)
+                elif op == '==':
+                    res = int(a == b)
+                else:  # '!='
+                    res = int(a != b)
+                return str(res)
+
+    return None
+
+
 def copy_instructions(instructions):
     """Deep copy a list of TAC instructions."""
     return [i.copy() for i in instructions]
@@ -455,21 +502,31 @@ def unreachable_code_elimination(instructions):
             unreachable = True
             continue
 
-        # iffalse <constant> goto L
-        # If constant is truthy (non-zero), iffalse never branches → remove it
-        # If constant is falsy (zero), iffalse always branches → convert to goto
-        if instr.op == 'iffalse' and is_number(instr.arg1):
-            val = get_number(instr.arg1)
-            if val == 0:
-                # iffalse 0 goto L → always branches, becomes goto L
-                result.append(GimpleStmt('goto', instr.arg2))
-                unreachable = True
-                changed = True
-                continue
+        # iffalse <condition> goto L
+        # If condition is a known constant (0/1) or a constant comparison
+        # expression, we can simplify:
+        #   - condition == 0 → always branches, becomes goto L
+        #   - condition != 0 → never branches, remove the iffalse
+        if instr.op == 'iffalse':
+            cond_val = None
+            if is_number(instr.arg1):
+                cond_val = get_number(instr.arg1)
             else:
-                # iffalse <non-zero> goto L → never branches, remove
-                changed = True
-                continue
+                const = eval_const_condition(instr.arg1)
+                if const is not None:
+                    cond_val = get_number(const)
+
+            if cond_val is not None:
+                if cond_val == 0:
+                    # iffalse 0 goto L → always branches, becomes goto L
+                    result.append(GimpleStmt('goto', instr.arg2))
+                    unreachable = True
+                    changed = True
+                    continue
+                else:
+                    # iffalse <non-zero> goto L → never branches, remove
+                    changed = True
+                    continue
 
         result.append(instr.copy())
 
