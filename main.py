@@ -11,7 +11,11 @@ import os
 
 from lexer import Lexer
 from parser import Parser
-from gimple_generator import GimpleGenerator, format_gimple
+from gimple_generator import (
+    GimpleGenerator,
+    format_gimple,
+    generate_from_gcc,
+)
 from optimizer import optimize
 from decompiler import gimple_to_cpp
 
@@ -235,8 +239,22 @@ def main():
     # ── Stage 3: Unoptimized GIMPLE (annotated) ───────────────────
     section("STAGE 3: GIMPLE IR (Unoptimized) — with optimization markers")
 
-    generator    = GimpleGenerator()
-    gimple_stmts = generator.generate(ast)
+    # Prefer real GCC GIMPLE via -fdump-tree-gimple, but fall back to the
+    # internal AST-based generator if GCC is unavailable or fails.
+    try:
+        gimple_stmts, function_tacs = generate_from_gcc(input_file)
+    except Exception as e:
+        print("\n  [info] GCC-backed GIMPLE generation failed, "
+              "falling back to internal generator.")
+        print(f"         Reason: {e}")
+        generator = GimpleGenerator()
+        gimple_stmts = generator.generate(ast)
+        function_tacs = generator.function_tacs
+    else:
+        # For compatibility with existing optimizer APIs, we still expose
+        # function_tacs separately (no need to instantiate GimpleGenerator).
+        generator = None
+
     total_before = count_stmts(gimple_stmts)
 
     # Determine which functions are called by others (not entry points)
@@ -270,7 +288,7 @@ def main():
         filtered.append(s)
 
     # Build per-statement optimization annotations
-    annotations = build_annotations(gimple_stmts, generator.function_tacs)
+    annotations = build_annotations(gimple_stmts, function_tacs)
 
     print()
     print_gimple_annotated(filtered, annotations)
@@ -281,7 +299,7 @@ def main():
 
     optimized, pass_log = optimize(
         gimple_stmts,
-        function_tacs=generator.function_tacs,
+        function_tacs=function_tacs,
         verbose=False
     )
 

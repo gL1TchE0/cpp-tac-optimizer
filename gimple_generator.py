@@ -8,6 +8,13 @@ Temporary variables use the naming convention _N (SSA-style).
 Basic blocks are labeled as <bb N>.
 """
 
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
 from ast_nodes import *
 
 
@@ -357,3 +364,208 @@ class GimpleGenerator:
             return temp
 
         return str(expr)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GCC-BACKED GIMPLE LOADER
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def _run_gcc_dump_gimple(source_path, gcc='g++'):
+    """Invoke GCC to produce a -fdump-tree-gimple file for the given source.
+
+    Returns the path to the generated .gimple file.
+    """
+    source_path = Path(source_path).resolve()
+    if not source_path.exists():
+        raise FileNotFoundError(f"Input source file not found: {source_path}")
+
+    tmpdir = Path(tempfile.mkdtemp(prefix="gcc_gimple_"))
+    try:
+        # Copy the source into the temp directory so GCC writes dumps there
+        tmp_src = tmpdir / source_path.name
+        shutil.copy2(source_path, tmp_src)
+
+        # Compile with GIMPLE dump enabled. We don't care about the object file,
+        # only about the dump that GCC writes next to the source.
+        cmd = [
+            gcc,
+            "-O0",
+            "-fdump-tree-gimple",
+            "-c",
+            str(tmp_src),
+        ]
+
+        proc = subprocess.run(
+            cmd,
+            cwd=str(tmpdir),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"GCC failed with exit code {proc.returncode}:\n{proc.stderr}"
+            )
+
+        # Find the .gimple dump file GCC produced
+        gimple_files = list(tmpdir.glob("*.gimple"))
+        if not gimple_files:
+            raise FileNotFoundError(
+                "GCC did not produce a .gimple dump file "
+                "(expected with -fdump-tree-gimple)."
+            )
+
+        # If multiple, pick the most recently modified
+        gimple_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return gimple_files[0]
+    finally:
+        # NOTE: We intentionally do not delete tmpdir so users can inspect
+        # the raw dump if they wish. Uncomment to auto-clean:
+        # shutil.rmtree(tmpdir, ignore_errors=True)
+        pass
+
+
+def _parse_gcc_gimple_dump(dump_path):
+    """Parse a GCC -fdump-tree-gimple file into GimpleStmt objects.
+
+    This is a *conservative* parser that focuses on the core patterns used
+    by the optimizer: assignments, arithmetic, comparisons, gotos, labels,
+    and returns. More complex constructs are treated as opaque assignments.
+    """
+    dump_path = Path(dump_path)
+    text = dump_path.read_text(encoding="utf-8", errors="replace")
+
+    func_header_re = re.compile(r"^([A-Za-z_]\w*)\s*\(")
+    bb_label_re = re.compile(r"^<bb\s+(\d+)>:")
+    goto_re = re.compile(r"^\s*goto\s+<bb\s+(\d+)>;")
+    return_re = re.compile(r"^\s*return(?:\s+(.+))?;")
+    assign_re = re.compile(r"^\s*([\w\.]+)\s*=\s*(.+);")
+
+    # Binary ops ordered by length to avoid partial matches
+    bin_ops = [
+        "<=", ">=", "==", "!=", "&&", "||", "<<", ">>",
+        "+", "-", "*", "/", "%", "<", ">",
+    ]
+
+    def parse_rhs(rhs):
+        rhs = rhs.strip()
+        # Unary negation / logical not
+        if rhs.startswith("-") and " " not in rhs[1:]:
+            return "neg", rhs[1:].strip(), None
+        if rhs.startswith("!") and " " not in rhs[1:]:
+            return "not", rhs[1:].strip(), None
+
+        # Binary operation
+        for op in bin_ops:
+            parts = rhs.split(op)
+            if len(parts) == 2:
+                left, right = parts[0].strip(), parts[1].strip()
+                if left and right:
+                    return op, left, right
+
+        # Fallback: treat as simple assignment
+        return "=", rhs, None
+
+    instructions = []
+    function_tacs = {}
+    current_func = None
+    func_start = None
+
+    lines = text.splitlines()
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip GCC comments and empty lines
+        if not stripped or stripped.startswith(";;"):
+            continue
+
+        # Function header: foo () / int foo (int x)
+        m_func = func_header_re.match(stripped)
+        if m_func and not stripped.endswith(";"):
+            name = m_func.group(1)
+            # Avoid matching constructs like "struct foo {"
+            if not stripped.startswith(("struct ", "class ", "union ")):
+                # Close previous function if any
+                if current_func is not None:
+                    function_tacs[current_func] = list(
+                        range(func_start, len(instructions))
+                    )
+                    instructions.append(GimpleStmt("func_end", current_func))
+
+                current_func = name
+                func_start = len(instructions)
+                instructions.append(GimpleStmt("func_begin", name))
+                continue
+
+        # Function end: closing brace at top level of function body
+        if stripped == "}" and current_func is not None:
+            function_tacs[current_func] = list(
+                range(func_start, len(instructions))
+            )
+            instructions.append(GimpleStmt("func_end", current_func))
+            current_func = None
+            func_start = None
+            continue
+
+        # Basic block labels: <bb 2>:
+        m_bb = bb_label_re.match(stripped)
+        if m_bb:
+            bb_num = m_bb.group(1)
+            instructions.append(GimpleStmt("label", f"<bb {bb_num}>"))
+            continue
+
+        # Goto
+        m_goto = goto_re.match(stripped)
+        if m_goto:
+            bb_num = m_goto.group(1)
+            instructions.append(GimpleStmt("goto", f"<bb {bb_num}>"))
+            continue
+
+        # Return
+        m_ret = return_re.match(stripped)
+        if m_ret:
+            val = m_ret.group(1)
+            if val is not None:
+                val = val.strip()
+            instructions.append(GimpleStmt("return", val))
+            continue
+
+        # Assignment / expression
+        m_asn = assign_re.match(stripped)
+        if m_asn:
+            lhs = m_asn.group(1)
+            rhs = m_asn.group(2).strip()
+            op, arg1, arg2 = parse_rhs(rhs)
+            if op == "=" and arg2 is None:
+                instructions.append(GimpleStmt("=", arg1, result=lhs))
+            elif op in ("neg", "not"):
+                instructions.append(GimpleStmt(op, arg1, result=lhs))
+            else:
+                instructions.append(GimpleStmt(op, arg1, arg2, lhs))
+            continue
+
+        # Fallback: ignore unrecognized lines; they may be GCC metadata or
+        # constructs we don't currently translate. The optimizer will simply
+        # not see them.
+        continue
+
+    # Close trailing function if file ended without explicit "}"
+    if current_func is not None:
+        function_tacs[current_func] = list(
+            range(func_start, len(instructions))
+        )
+        instructions.append(GimpleStmt("func_end", current_func))
+
+    return instructions, function_tacs
+
+
+def generate_from_gcc(source_path, gcc="g++"):
+    """Run GCC to dump real GIMPLE and parse it into our IR.
+
+    Returns:
+        (instructions, function_tacs)
+    """
+    dump_path = _run_gcc_dump_gimple(source_path, gcc=gcc)
+    return _parse_gcc_gimple_dump(dump_path)
+
