@@ -1,0 +1,97 @@
+int add(int, int) (int x, int y)
+{
+  int D.35861;
+
+  D.35861 = x + y;
+  return D.35861;
+}
+
+
+int main() ()
+{
+  struct basic_ostream & D.35868;
+  int D.35869;
+
+  {
+    int a;
+    int b;
+    int c;
+    int d;
+    int e;
+    int f;
+    int g;
+    int h;
+    int dead;
+    int sum;
+
+    a = 5;
+    b = 10;
+    c = a + b;
+    d = a + b;
+    e = 20;
+    f = e;
+    g = c * 2;
+    h = g;
+    dead = a * b;
+    if (0 != 0) goto <D.35863>; else goto <D.35864>;
+    <D.35863>:
+    std::operator<< <std::char_traits<char> > (&cout, "never executes");
+    goto <D.35865>;
+    <D.35864>:
+    <D.35865>:
+    sum = add (a, b);
+    {
+      int i;
+
+      i = 0;
+      <D.35866>:
+      if (i > 4) goto <D.32732>; else goto <D.35867>;
+      <D.35867>:
+      {
+        int t;
+
+        t = i * 2;
+      }
+      i = i + 1;
+      goto <D.35866>;
+      <D.32732>:
+    }
+    D.35868 = std::basic_ostream<char>::operator<< (&cout, sum);
+    std::basic_ostream<char>::operator<< (D.35868, endl);
+    D.35869 = 0;
+    return D.35869;
+  }
+  D.35869 = 0;
+  return D.35869;
+}
+
+
+void __static_initialization_and_destruction_0(int, int) (int __initialize_p, int __priority)
+{
+  if (__initialize_p == 1) goto <D.35872>; else goto <D.35873>;
+  <D.35872>:
+  if (__priority == 65535) goto <D.35874>; else goto <D.35875>;
+  <D.35874>:
+  std::ios_base::Init::Init (&__ioinit);
+  atexit (__tcf_0);
+  goto <D.35876>;
+  <D.35875>:
+  <D.35876>:
+  goto <D.35877>;
+  <D.35873>:
+  <D.35877>:
+}
+
+
+void __tcf_0() ()
+{
+  std::ios_base::Init::~Init (&__ioinit);
+}
+
+
+(static initializers for sample.cpp) ()
+{
+  __static_initialization_and_destruction_0 (1, 65535);
+}
+
+

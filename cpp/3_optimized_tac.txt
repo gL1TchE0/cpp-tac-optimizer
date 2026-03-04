@@ -1,0 +1,27 @@
+t1 = x + y
+# removed dead code : D.35861 = t1
+a = 5
+b = 10
+t2 = a + b
+c = t2
+t3 = t2   # CSE
+# removed dead code : d = t3
+e = 20
+# removed dead code : f = e
+t4 = c << 1   # strength reduction
+g = t4
+# removed dead code : h = g
+t5 = a * b
+# removed dead code : dead = t5
+# removed dead code : if (0 ! = 0) goto <D.35863> else goto <D.35864>
+sum = add (a, b)
+i = 0
+t6 = i << 1   # strength reduction
+# removed dead code : t = t6
+t7 = i + 1
+i = t7
+# removed dead code : D.35868 = std::basic_ostream<char>::operator<< (&cout, sum)
+# removed dead code : D.35869 = 0
+# removed dead code : D.35869 = 0
+# removed dead code : if (__initialize_p = = 1) goto <D.35872> else goto <D.35873>
+# removed dead code : if (__priority = = 65535) goto <D.35874> else goto <D.35875>

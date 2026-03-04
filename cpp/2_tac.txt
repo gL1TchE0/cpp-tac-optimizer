@@ -1,0 +1,27 @@
+t1 = x + y
+D.35861 = t1
+a = 5
+b = 10
+t2 = a + b
+c = t2
+t3 = a + b
+d = t3
+e = 20
+f = e
+t4 = c * 2
+g = t4
+h = g
+t5 = a * b
+dead = t5
+if (0 ! = 0) goto <D.35863> else goto <D.35864>
+sum = add (a, b)
+i = 0
+t6 = i * 2
+t = t6
+t7 = i + 1
+i = t7
+D.35868 = std::basic_ostream<char>::operator<< (&cout, sum)
+D.35869 = 0
+D.35869 = 0
+if (__initialize_p = = 1) goto <D.35872> else goto <D.35873>
+if (__priority = = 65535) goto <D.35874> else goto <D.35875>
