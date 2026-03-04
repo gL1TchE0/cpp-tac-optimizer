@@ -1,0 +1,7 @@
+// Method: <TestProgram2: boolean alwaysTrue()>
+// Jimple (Three-Address Code) Representation
+
+    public static boolean alwaysTrue()
+    {
+        return 1;
+    }

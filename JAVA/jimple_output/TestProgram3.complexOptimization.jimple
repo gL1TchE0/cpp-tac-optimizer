@@ -1,0 +1,21 @@
+// Method: <TestProgram3: int complexOptimization(int,int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int complexOptimization(int, int)
+    {
+        int i0, i1, i2, i3, i4, i5;
+
+        i0 := @parameter0: int;
+
+        i2 := @parameter1: int;
+
+        i1 = i0 + 0;
+
+        i3 = i2 * 1;
+
+        i4 = i1 + i3;
+
+        i5 = 15 + i4;
+
+        return i5;
+    }

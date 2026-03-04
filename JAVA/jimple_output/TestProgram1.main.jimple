@@ -1,0 +1,46 @@
+// Method: <TestProgram1: void main(java.lang.String[])>
+// Jimple (Three-Address Code) Representation
+
+    public static void main(java.lang.String[])
+    {
+        java.io.PrintStream $r0, $r2, $r4, $r6;
+        java.lang.String[] r8;
+        int $i0, $i1, $i2, $i3;
+        java.lang.String $r1, $r3, $r5, $r7;
+
+        r8 := @parameter0: java.lang.String[];
+
+        $r0 = <java.lang.System: java.io.PrintStream out>;
+
+        $i0 = staticinvoke <TestProgram1: int constantPropagation()>();
+
+        $r1 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i0) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Constant Propagation: \u0001");
+
+        virtualinvoke $r0.<java.io.PrintStream: void println(java.lang.String)>($r1);
+
+        $r2 = <java.lang.System: java.io.PrintStream out>;
+
+        $i1 = staticinvoke <TestProgram1: int algebraicSimplification(int)>(10);
+
+        $r3 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i1) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Algebraic Simplification: \u0001");
+
+        virtualinvoke $r2.<java.io.PrintStream: void println(java.lang.String)>($r3);
+
+        $r4 = <java.lang.System: java.io.PrintStream out>;
+
+        $i2 = staticinvoke <TestProgram1: int deadCodeExample(int)>(5);
+
+        $r5 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i2) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Dead Code Example: \u0001");
+
+        virtualinvoke $r4.<java.io.PrintStream: void println(java.lang.String)>($r5);
+
+        $r6 = <java.lang.System: java.io.PrintStream out>;
+
+        $i3 = staticinvoke <TestProgram1: int copyPropagation(int)>(7);
+
+        $r7 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i3) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Copy Propagation: \u0001");
+
+        virtualinvoke $r6.<java.io.PrintStream: void println(java.lang.String)>($r7);
+
+        return;
+    }

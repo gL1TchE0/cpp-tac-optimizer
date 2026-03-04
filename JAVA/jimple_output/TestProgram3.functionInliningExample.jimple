@@ -1,0 +1,15 @@
+// Method: <TestProgram3: int functionInliningExample(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int functionInliningExample(int)
+    {
+        int i0, i1, i2;
+
+        i0 := @parameter0: int;
+
+        i1 = staticinvoke <TestProgram3: int square(int)>(i0);
+
+        i2 = staticinvoke <TestProgram3: int add(int,int)>(i1, 10);
+
+        return i2;
+    }

@@ -1,0 +1,13 @@
+// Method: <TestProgram1: int deadCodeExample(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int deadCodeExample(int)
+    {
+        int i0, i1;
+
+        i0 := @parameter0: int;
+
+        i1 = i0 + 10;
+
+        return i1;
+    }

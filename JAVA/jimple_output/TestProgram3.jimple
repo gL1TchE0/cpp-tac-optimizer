@@ -1,0 +1,136 @@
+// Class: TestProgram3
+// Complete Jimple Representation
+
+public class TestProgram3 extends java.lang.Object
+{
+
+    public void <init>()
+    {
+        TestProgram3 r0;
+
+        r0 := @this: TestProgram3;
+
+        specialinvoke r0.<java.lang.Object: void <init>()>();
+
+        return;
+    }
+
+    public static int square(int)
+    {
+        int i0, $i1;
+
+        i0 := @parameter0: int;
+
+        $i1 = i0 * i0;
+
+        return $i1;
+    }
+
+    public static int add(int, int)
+    {
+        int i0, i1, $i2;
+
+        i0 := @parameter0: int;
+
+        i1 := @parameter1: int;
+
+        $i2 = i0 + i1;
+
+        return $i2;
+    }
+
+    public static int functionInliningExample(int)
+    {
+        int i0, i1, i2;
+
+        i0 := @parameter0: int;
+
+        i1 = staticinvoke <TestProgram3: int square(int)>(i0);
+
+        i2 = staticinvoke <TestProgram3: int add(int,int)>(i1, 10);
+
+        return i2;
+    }
+
+    public static int complexOptimization(int, int)
+    {
+        int i0, i1, i2, i3, i4, i5;
+
+        i0 := @parameter0: int;
+
+        i2 := @parameter1: int;
+
+        i1 = i0 + 0;
+
+        i3 = i2 * 1;
+
+        i4 = i1 + i3;
+
+        i5 = 15 + i4;
+
+        return i5;
+    }
+
+    public static int strengthReduction(int)
+    {
+        int i0, i1, i2, i3, i4, i5, $i6, $i7, $i8, $i9;
+
+        i0 := @parameter0: int;
+
+        i1 = i0 * 2;
+
+        i2 = i0 * 4;
+
+        i3 = i0 * 8;
+
+        i4 = i0 / 2;
+
+        i5 = i0 / 4;
+
+        $i6 = i1 + i2;
+
+        $i7 = $i6 + i3;
+
+        $i8 = $i7 + i4;
+
+        $i9 = $i8 + i5;
+
+        return $i9;
+    }
+
+    public static void main(java.lang.String[])
+    {
+        java.io.PrintStream $r0, $r2, $r4;
+        java.lang.String[] r6;
+        int $i0, $i1, $i2;
+        java.lang.String $r1, $r3, $r5;
+
+        r6 := @parameter0: java.lang.String[];
+
+        $r0 = <java.lang.System: java.io.PrintStream out>;
+
+        $i0 = staticinvoke <TestProgram3: int functionInliningExample(int)>(5);
+
+        $r1 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i0) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Function Inlining: \u0001");
+
+        virtualinvoke $r0.<java.io.PrintStream: void println(java.lang.String)>($r1);
+
+        $r2 = <java.lang.System: java.io.PrintStream out>;
+
+        $i1 = staticinvoke <TestProgram3: int complexOptimization(int,int)>(3, 7);
+
+        $r3 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i1) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Complex Optimization: \u0001");
+
+        virtualinvoke $r2.<java.io.PrintStream: void println(java.lang.String)>($r3);
+
+        $r4 = <java.lang.System: java.io.PrintStream out>;
+
+        $i2 = staticinvoke <TestProgram3: int strengthReduction(int)>(16);
+
+        $r5 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i2) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Strength Reduction: \u0001");
+
+        virtualinvoke $r4.<java.io.PrintStream: void println(java.lang.String)>($r5);
+
+        return;
+    }
+}

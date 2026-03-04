@@ -1,0 +1,25 @@
+// Method: <TestProgram2: int loopUnrolling()>
+// Jimple (Three-Address Code) Representation
+
+    public static int loopUnrolling()
+    {
+        int $i0, i1, i2;
+
+        i1 = 0;
+
+        i2 = 0;
+
+     label1:
+        if i2 >= 4 goto label2;
+
+        $i0 = i2 * 2;
+
+        i1 = i1 + $i0;
+
+        i2 = i2 + 1;
+
+        goto label1;
+
+     label2:
+        return i1;
+    }

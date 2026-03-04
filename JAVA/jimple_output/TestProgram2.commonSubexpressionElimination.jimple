@@ -1,0 +1,29 @@
+// Method: <TestProgram2: int commonSubexpressionElimination(int,int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int commonSubexpressionElimination(int, int)
+    {
+        int i0, i1, $i2, i3, $i4, i5, $i6, i7, $i8, $i9;
+
+        i0 := @parameter0: int;
+
+        i1 := @parameter1: int;
+
+        $i2 = i0 * i1;
+
+        i3 = $i2 + 5;
+
+        $i4 = i0 * i1;
+
+        i5 = $i4 + 10;
+
+        $i6 = i0 * i1;
+
+        i7 = $i6 + 15;
+
+        $i8 = i3 + i5;
+
+        $i9 = $i8 + i7;
+
+        return $i9;
+    }

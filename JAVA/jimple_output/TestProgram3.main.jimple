@@ -1,0 +1,38 @@
+// Method: <TestProgram3: void main(java.lang.String[])>
+// Jimple (Three-Address Code) Representation
+
+    public static void main(java.lang.String[])
+    {
+        java.io.PrintStream $r0, $r2, $r4;
+        java.lang.String[] r6;
+        int $i0, $i1, $i2;
+        java.lang.String $r1, $r3, $r5;
+
+        r6 := @parameter0: java.lang.String[];
+
+        $r0 = <java.lang.System: java.io.PrintStream out>;
+
+        $i0 = staticinvoke <TestProgram3: int functionInliningExample(int)>(5);
+
+        $r1 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i0) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Function Inlining: \u0001");
+
+        virtualinvoke $r0.<java.io.PrintStream: void println(java.lang.String)>($r1);
+
+        $r2 = <java.lang.System: java.io.PrintStream out>;
+
+        $i1 = staticinvoke <TestProgram3: int complexOptimization(int,int)>(3, 7);
+
+        $r3 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i1) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Complex Optimization: \u0001");
+
+        virtualinvoke $r2.<java.io.PrintStream: void println(java.lang.String)>($r3);
+
+        $r4 = <java.lang.System: java.io.PrintStream out>;
+
+        $i2 = staticinvoke <TestProgram3: int strengthReduction(int)>(16);
+
+        $r5 = dynamicinvoke "makeConcatWithConstants" <java.lang.String (int)>($i2) <java.lang.invoke.StringConcatFactory: java.lang.invoke.CallSite makeConcatWithConstants(java.lang.invoke.MethodHandles$Lookup,java.lang.String,java.lang.invoke.MethodType,java.lang.String,java.lang.Object[])>("Strength Reduction: \u0001");
+
+        virtualinvoke $r4.<java.io.PrintStream: void println(java.lang.String)>($r5);
+
+        return;
+    }

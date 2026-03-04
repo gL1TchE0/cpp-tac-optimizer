@@ -1,0 +1,29 @@
+// Method: <TestProgram3: int strengthReduction(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int strengthReduction(int)
+    {
+        int i0, i1, i2, i3, i4, i5, $i6, $i7, $i8, $i9;
+
+        i0 := @parameter0: int;
+
+        i1 = i0 * 2;
+
+        i2 = i0 * 4;
+
+        i3 = i0 * 8;
+
+        i4 = i0 / 2;
+
+        i5 = i0 / 4;
+
+        $i6 = i1 + i2;
+
+        $i7 = $i6 + i3;
+
+        $i8 = $i7 + i4;
+
+        $i9 = $i8 + i5;
+
+        return $i9;
+    }

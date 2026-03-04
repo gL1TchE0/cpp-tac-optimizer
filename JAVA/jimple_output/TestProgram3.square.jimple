@@ -1,0 +1,13 @@
+// Method: <TestProgram3: int square(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int square(int)
+    {
+        int i0, $i1;
+
+        i0 := @parameter0: int;
+
+        $i1 = i0 * i0;
+
+        return $i1;
+    }

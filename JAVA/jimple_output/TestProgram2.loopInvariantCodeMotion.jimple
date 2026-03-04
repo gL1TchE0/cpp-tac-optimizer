@@ -1,0 +1,27 @@
+// Method: <TestProgram2: int loopInvariantCodeMotion(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int loopInvariantCodeMotion(int)
+    {
+        int i0, $i1, i2, i3;
+
+        i0 := @parameter0: int;
+
+        i2 = 0;
+
+        i3 = 0;
+
+     label1:
+        if i3 >= i0 goto label2;
+
+        $i1 = i3 + 5000;
+
+        i2 = i2 + $i1;
+
+        i3 = i3 + 1;
+
+        goto label1;
+
+     label2:
+        return i2;
+    }

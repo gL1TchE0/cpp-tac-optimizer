@@ -1,0 +1,19 @@
+// Method: <TestProgram1: int algebraicSimplification(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int algebraicSimplification(int)
+    {
+        int i0, i1, i2, i3, i4;
+
+        i0 := @parameter0: int;
+
+        i1 = i0 * 1;
+
+        i2 = i1 + 0;
+
+        i3 = i2 * 2;
+
+        i4 = i3 / 2;
+
+        return i4;
+    }

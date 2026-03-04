@@ -1,0 +1,20 @@
+// Method: <TestProgram2: int branchOptimization(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int branchOptimization(int)
+    {
+        int i0, $i1, $i2;
+
+        i0 := @parameter0: int;
+
+        if 1 == 0 goto label1;
+
+        $i2 = i0 * 2;
+
+        return $i2;
+
+     label1:
+        $i1 = i0 * 3;
+
+        return $i1;
+    }

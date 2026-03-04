@@ -1,0 +1,13 @@
+// Method: <TestProgram3: void <init>()>
+// Jimple (Three-Address Code) Representation
+
+    public void <init>()
+    {
+        TestProgram3 r0;
+
+        r0 := @this: TestProgram3;
+
+        specialinvoke r0.<java.lang.Object: void <init>()>();
+
+        return;
+    }

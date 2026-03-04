@@ -1,0 +1,7 @@
+// Method: <TestProgram1: int constantPropagation()>
+// Jimple (Three-Address Code) Representation
+
+    public static int constantPropagation()
+    {
+        return 30;
+    }

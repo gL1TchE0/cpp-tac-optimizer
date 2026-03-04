@@ -1,0 +1,21 @@
+// Method: <TestProgram2: int unreachableCode(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int unreachableCode(int)
+    {
+        int i0, i1;
+
+        i0 := @parameter0: int;
+
+        if i0 <= 10 goto label1;
+
+        i1 = i0;
+
+        goto label2;
+
+     label1:
+        i1 = i0 + 1;
+
+     label2:
+        return i1;
+    }

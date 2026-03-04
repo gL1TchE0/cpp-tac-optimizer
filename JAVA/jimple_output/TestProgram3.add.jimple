@@ -1,0 +1,15 @@
+// Method: <TestProgram3: int add(int,int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int add(int, int)
+    {
+        int i0, i1, $i2;
+
+        i0 := @parameter0: int;
+
+        i1 := @parameter1: int;
+
+        $i2 = i0 + i1;
+
+        return $i2;
+    }

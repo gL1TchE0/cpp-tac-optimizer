@@ -1,0 +1,13 @@
+// Method: <TestProgram1: int copyPropagation(int)>
+// Jimple (Three-Address Code) Representation
+
+    public static int copyPropagation(int)
+    {
+        int i0, i1;
+
+        i0 := @parameter0: int;
+
+        i1 = i0 + 5;
+
+        return i1;
+    }
